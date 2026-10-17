@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Splash window while the app process starts (before Android 12).
+         The app is light only, so there is no night variant. -->
+    <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        <item name="android:windowBackground">@drawable/launch_background</item>
+    </style>
+    <!-- Window behind the Flutter UI once it is running. -->
+    <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        <item name="android:windowBackground">@color/splash_background</item>
+    </style>
+</resources>

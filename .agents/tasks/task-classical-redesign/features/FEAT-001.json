@@ -1,0 +1,33 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Domain-only change (independent of all styling work): extend WatchTodayOverview so every HabitWithStatus carries a 7-day HabitStreak computed by the existing pure StreakCalculator. This is the ONLY permitted domain change. Section 4 of /Users/macbook/Desktop/Assignment/.agents/tasks/plan.md is the spec.",
+  "status": "completed",
+  "steps": [
+    "Read plan.md sections 0 and 4, then lib/features/habits/domain/usecases/watch_habit_detail.dart (pattern) and watch_today_overview.dart.",
+    "Edit lib/features/habits/domain/entities/habit_with_status.dart: add `required HabitStreak streak` (import habit_streak.dart); keep `habit` and `isDone`.",
+    "Edit lib/features/habits/domain/usecases/watch_today_overview.dart: constructor `WatchTodayOverview(this._repository, this._clock, this._calculator)`; windowStart = today.minusDays(StreakCalculator.defaultWindowDays - 1); combine watchHabits() with repository.watchCompletions(from: windowStart, to: today); keep the existing isDone derivation (completion for that habit with dateKey == today); add `streak: _calculator.calculate(habit: habit, completions: completions, today: today)`. No data layer / repository interface change.",
+    "Edit lib/core/di/injection.dart (~line 55): pass getIt<StreakCalculator>() as the third argument. Nothing else in lib/core/di.",
+    "Run `dart run build_runner build --delete-conflicting-outputs` and confirm habit_with_status.freezed.dart changed and no other generated file churned unexpectedly.",
+    "Update test/helpers/builders.dart: add buildStreak({doneOffsets, createdDaysAgo, today}) (move/generalise the helper currently inside test/features/habits/presentation/widgets/streak_row_test.dart so that file imports it from helpers) and buildItem({habit, isDone, streak}) returning a HabitWithStatus.",
+    "Update test/features/habits/domain/usecases/watch_today_overview_test.dart: construct with `const StreakCalculator()`, stub watchCompletions(from: today.minusDays(6), to: today), keep every existing assertion, ADD tests: streak.days has 7 entries oldest first and last isToday; currentStreak counts a run ending yesterday while today is open; other habits' completions are ignored; completions outside the window are ignored (and stub only the 7-day window call); days before createdDateKey are notApplicable; isDone stays true only for a completion dated today; error from either stream still maps to Left.",
+    "Update every HabitWithStatus( construction to pass `streak:` (prefer the buildItem/buildStreak helpers): test/features/habits/presentation/accessibility_test.dart, accessibility_themed_test.dart, bloc/today_bloc_test.dart, pages/today_page_test.dart, widgets/progress_header_test.dart.",
+    "Run dart format on touched files, flutter analyze, the architecture test, and the full test suite."
+  ],
+  "acceptance_criteria": [
+    "HabitWithStatus has a required `streak` field of type HabitStreak and the freezed file is regenerated.",
+    "WatchTodayOverview requests watchCompletions(from: today-6, to: today) exactly once and attaches a calculator-built streak per habit; isDone semantics are unchanged.",
+    "injection.dart only differs by the added constructor argument; lib/features/habits/data, repository interface, bloc events/states, streak_calculator.dart are untouched.",
+    "New watch_today_overview tests cover streak days, current streak ending yesterday, foreign-habit and out-of-window completions, notApplicable days, and isDone.",
+    "`flutter test` passes with at least 356 tests (baseline) and `flutter test test/architecture_test.dart` passes; `flutter analyze` reports no issues."
+  ],
+  "verification": [
+    "cd /Users/macbook/Desktop/Assignment && dart run build_runner build --delete-conflicting-outputs",
+    "cd /Users/macbook/Desktop/Assignment && flutter test test/features/habits/domain",
+    "cd /Users/macbook/Desktop/Assignment && flutter test test/architecture_test.dart",
+    "cd /Users/macbook/Desktop/Assignment && flutter analyze",
+    "cd /Users/macbook/Desktop/Assignment && flutter test 2>&1 | tail -5"
+  ],
+  "blocked_reason": null,
+  "findings": "Done. HabitWithStatus now has required `HabitStreak streak`; WatchTodayOverview(repository, clock, calculator) requests watchCompletions(from: today-6, to: today) once and attaches calculator-built streak (isDone derivation unchanged); injection.dart passes getIt<StreakCalculator>(). habit_with_status.freezed.dart regenerated (only generated file whose content changed). Test helpers in test/helpers/builders.dart: buildStreak({doneOffsets, createdDaysAgo=30, today=2026-10-17, habit}) and buildItem({habit, isDone=false, streak}) (streak defaults to done-today when isDone else empty). streak_row_test now uses buildStreak (still imports phosphor and uses brightness; later FEATs must migrate it). All HabitWithStatus( constructions in tests replaced by buildItem(. watch_today_overview_test gained 8 cases (364 tests total, analyze clean, architecture test green). ENV NOTE for later FEATs: in this sandbox the `flutter`/`dart` wrapper scripts fail (cannot write into the Flutter SDK dir: engine.stamp, lockfile, version stamp, and ~/.dart-tool). Working invocation (zsh): `export FLUTTER_ALREADY_LOCKED=true PUB_CACHE=/Users/macbook/.pub-cache HOME=/tmp/kirohome FLUTTER_ROOT=/Users/macbook/Desktop/Development/flutter; fl() { $FLUTTER_ROOT/bin/cache/dart-sdk/bin/dart $FLUTTER_ROOT/bin/cache/flutter_tools.snapshot --no-version-check --suppress-analytics \"$@\"; }` then `fl analyze --no-pub`, `fl test --no-pub`, and for codegen `dart run build_runner build` via `$FLUTTER_ROOT/bin/cache/dart-sdk/bin/dart --suppress-analytics run build_runner build` (build_runner ignores --delete-conflicting-outputs now). `fl pub get/remove` and device builds may need the same env and could hit the read-only SDK dir; formatting works with the bare dart-sdk binary (`dart format lib test`)."
+}

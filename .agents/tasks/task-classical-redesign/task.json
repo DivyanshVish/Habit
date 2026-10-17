@@ -1,0 +1,7 @@
+{
+  "task_id": "task-classical-redesign",
+  "task_description": "Replace the visual design of the working Flutter habit_tracker app with the user's light-only classical serif design (Cormorant Garamond + Lora bundled, gold #B68235 stroke accent, outlined buttons, hairlines, toast pills) taken from design_reference/new_ui, keeping go_router + flutter_bloc + get_it, plus one domain extension (7-day HabitStreak on HabitWithStatus via WatchTodayOverview). Master plan: /Users/macbook/Desktop/Assignment/.agents/tasks/plan.md",
+  "status": "pending",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003", "FEAT-004"],
+  "blocked_reason": null
+}

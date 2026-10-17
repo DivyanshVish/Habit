@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Shown before Android 12 while the Flutter engine starts. Android 12+ uses
+     values-v31/styles.xml instead. Image: tool/brand/generate_brand_assets.py -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/splash_background" />
+    <item>
+        <bitmap
+            android:gravity="center"
+            android:src="@drawable/launch_logo" />
+    </item>
+</layer-list>
