@@ -67,6 +67,22 @@ class AppTokens extends ThemeExtension<AppTokens> {
   final AppRadii radii;
   final AppTextTokens text;
 
+  /// Calm tones for group pictures (see the emblem widgets). The icon on top
+  /// is always [emblemOn]. Like every colour here, they live only in this file.
+  static const List<Color> emblemPalette = [
+    Color(0xFFE9D9B8),
+    Color(0xFFD8E2D0),
+    Color(0xFFCFDDE6),
+    Color(0xFFE6D0D0),
+    Color(0xFFDDD3E6),
+    Color(0xFFE3DDC8),
+    Color(0xFFCFE3DF),
+    Color(0xFFE8D6C4),
+  ];
+
+  /// Icon colour on top of any [emblemPalette] colour.
+  static const Color emblemOn = Color(0xFF201F1D);
+
   static const AppTokens light = AppTokens(
     paper: Color(0xFFF3F2F2),
     ink: Color(0xFF201F1D),

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:habit_tracker/core/error/exceptions.dart';
 import 'package:habit_tracker/core/error/failure.dart';
+import 'package:habit_tracker/core/platform/platform_services.dart';
 
 /// Translates framework exceptions into domain [Failure]s. Lives in the data
 /// layer so the domain never learns about Firebase.
@@ -13,6 +14,21 @@ Failure mapExceptionToFailure(Object error) {
   }
   if (error is NotFoundException) {
     return const Failure.notFound(message: 'This habit no longer exists.');
+  }
+  if (error is CallableException) {
+    return switch (error.code) {
+      'unauthenticated' ||
+      'permission-denied' => Failure.unauthenticated(message: error.message),
+      'not-found' => Failure.notFound(message: error.message),
+      'unavailable' || 'deadline-exceeded' => const Failure.network(),
+      // The server states the rule that was broken in plain words.
+      'invalid-argument' ||
+      'failed-precondition' ||
+      'already-exists' ||
+      'resource-exhausted' ||
+      'out-of-range' => Failure.validation(message: error.message),
+      _ => const Failure.server(),
+    };
   }
   if (error is FirebaseAuthException) {
     return switch (error.code) {

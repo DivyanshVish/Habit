@@ -8,6 +8,7 @@ import 'package:habit_tracker/core/brand.dart';
 import 'package:habit_tracker/core/router/app_router.dart';
 import 'package:habit_tracker/core/theme/app_motion.dart';
 import 'package:habit_tracker/core/theme/app_theme.dart';
+import 'package:habit_tracker/core/theme/app_tokens.dart';
 import 'package:habit_tracker/features/habits/presentation/widgets/splash_view.dart';
 import 'package:habit_tracker/features/habits/presentation/widgets/state_views.dart';
 
@@ -189,10 +190,18 @@ bool _reduceMotion(BuildContext context) {
   return features.disableAnimations || features.accessibleNavigation;
 }
 
-/// Makes the system bars transparent with dark icons.
+/// Makes the system bars transparent with dark icons, and paints the page
+/// colour behind the navigator.
+///
+/// Page transitions fade the old and new page at the same time, so for a
+/// moment neither is fully opaque. Without a colour behind them, the window's
+/// own background shows through and the screen flashes on every navigation.
 Widget _withSystemBars(BuildContext context, Widget? child) {
   return AnnotatedRegion<SystemUiOverlayStyle>(
     value: AppTheme.overlayStyle(),
-    child: child ?? const SizedBox.shrink(),
+    child: ColoredBox(
+      color: AppTokens.light.paper,
+      child: child ?? const SizedBox.shrink(),
+    ),
   );
 }
