@@ -30,14 +30,23 @@ const List<String> _frameworkPrefixes = [
   'package:cloud_firestore/',
   'package:firebase_core/',
   'package:firebase_auth/',
+  'package:cloud_functions/',
+  'package:firebase_messaging/',
+  'package:google_sign_in/',
   'dart:ui',
   'dart:io',
 ];
 
-bool _isFirebase(String import) =>
-    import.startsWith('package:cloud_firestore/') ||
-    import.startsWith('package:firebase_core/') ||
-    import.startsWith('package:firebase_auth/');
+const List<String> _firebasePrefixes = [
+  'package:cloud_firestore/',
+  'package:firebase_core/',
+  'package:firebase_auth/',
+  'package:cloud_functions/',
+  'package:firebase_messaging/',
+  'package:google_sign_in/',
+];
+
+bool _isFirebase(String import) => _firebasePrefixes.any(import.startsWith);
 
 bool _inLayer(String path, String layer) => path.contains('/$layer/');
 
@@ -147,6 +156,23 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 ''',
       });
       expect(violations, hasLength(2));
+    });
+
+    test('domain or presentation importing the new Firebase plugins', () {
+      final violations = findViolations({
+        'lib/features/groups/domain/usecases/x.dart': '''
+import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+''',
+        'lib/features/groups/presentation/bloc/x.dart': '''
+import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+''',
+      });
+      // 3 in domain (framework-free) + 3 in presentation (no Firebase).
+      expect(violations, hasLength(6));
     });
 
     test('data importing presentation', () {

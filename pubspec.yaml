@@ -42,6 +42,10 @@ dependencies:
   cloud_firestore: ^6.7.1
   firebase_core: ^4.0.0
   firebase_auth: ^6.0.0
+  # Collaborative habits: push and Google account upgrade (the backend is
+  # reached over plain HTTP). Exact versions are pinned by pubspec.lock.
+  firebase_messaging: ^16.7.0
+  google_sign_in: ^7.2.0
   rxdart: ^0.28.0
   bloc_concurrency: ^0.3.0
 

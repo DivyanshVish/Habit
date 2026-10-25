@@ -2,9 +2,175 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Every user can only read and write their own subtree.
+
+    // ---------------------------------------------------------------
+    // Helpers
+    // ---------------------------------------------------------------
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function pad(n) {
+      return (n < 10 ? '0' : '') + string(n);
+    }
+
+    // yyyy-MM-dd of a UTC timestamp.
+    function dateKeyOf(t) {
+      return string(t.year()) + '-' + pad(t.month()) + '-' + pad(t.day());
+    }
+
+    // A client may only record a completion for yesterday, today or tomorrow
+    // in UTC. Local dates anywhere from UTC-12 to UTC+14 always fall in here.
+    function dateKeyAllowed(key) {
+      return key in [
+        dateKeyOf(request.time - duration.value(1, 'd')),
+        dateKeyOf(request.time),
+        dateKeyOf(request.time + duration.value(1, 'd'))
+      ];
+    }
+
+    // The shape every shared or group completion document must have.
+    // The id is {uid}_{dateKey}, so a repeated request targets the same
+    // document and can never create a second record.
+    function validCompletion(docId) {
+      let data = request.resource.data;
+      return signedIn()
+        && data.uid == request.auth.uid
+        && data.dateKey is string
+        && dateKeyAllowed(data.dateKey)
+        && docId == request.auth.uid + '_' + data.dateKey
+        && data.completedAt == request.time
+        && data.keys().hasOnly(['uid', 'dateKey', 'completedAt', 'clientOpId']);
+    }
+
+    // A repeated set on an existing completion may only refresh completedAt.
+    function onlyRefreshesTimestamp() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(['completedAt', 'clientOpId']);
+    }
+
+    function ownsCompletion() {
+      return signedIn() && resource.data.uid == request.auth.uid;
+    }
+
+    // ---------------------------------------------------------------
+    // Personal data (unchanged): each user sees only their own subtree.
+    // Also holds settings, device tokens and the notification inbox.
+    // ---------------------------------------------------------------
     match /users/{uid}/{document=**} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // ---------------------------------------------------------------
+    // Shared habits. Created and membership-managed by callable functions.
+    // ---------------------------------------------------------------
+    match /sharedHabits/{sharedId} {
+      function isParticipant() {
+        return signedIn()
+          && request.auth.uid in get(/databases/$(database)/documents/sharedHabits/$(sharedId)).data.participantUids;
+      }
+
+      allow read: if signedIn() && request.auth.uid in resource.data.participantUids;
+      allow write: if false;
+
+      match /participants/{uid} {
+        allow read: if isParticipant();
+        allow write: if false;
+      }
+
+      match /completions/{docId} {
+        // Only the owner can read an individual completion. Everyone else
+        // sees the privacy-filtered aggregate on the cycle document.
+        allow read: if ownsCompletion();
+        allow create: if validCompletion(docId) && isParticipant();
+        allow update: if validCompletion(docId) && isParticipant()
+          && onlyRefreshesTimestamp();
+        allow delete: if ownsCompletion() && isParticipant();
+      }
+
+      match /cycles/{dateKey} {
+        allow read: if isParticipant();
+        allow write: if false;
+      }
+    }
+
+    // ---------------------------------------------------------------
+    // Groups. Created and managed only through callable functions.
+    // ---------------------------------------------------------------
+    match /groups/{groupId} {
+      function memberDoc() {
+        return get(/databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid));
+      }
+
+      function isActiveMember() {
+        return signedIn() && memberDoc().data.status == 'active';
+      }
+
+      function isGroupAdmin() {
+        return isActiveMember() && memberDoc().data.role in ['owner', 'admin'];
+      }
+
+      allow read: if isActiveMember();
+      allow write: if false;
+
+      match /members/{uid} {
+        allow read: if isActiveMember();
+        allow write: if false;
+      }
+
+      match /auditLog/{entryId} {
+        allow read: if isGroupAdmin();
+        allow write: if false;
+      }
+
+      // People waiting for an admin to let them in.
+      match /joinRequests/{uid} {
+        allow read: if isGroupAdmin();
+        allow write: if false;
+      }
+
+      match /habits/{habitId} {
+        function habitIsActive() {
+          return get(/databases/$(database)/documents/groups/$(groupId)/habits/$(habitId)).data.status == 'active';
+        }
+
+        allow read: if isActiveMember();
+        allow write: if false;
+
+        match /revisions/{revision} {
+          allow read: if isActiveMember();
+          allow write: if false;
+        }
+
+        match /completions/{docId} {
+          allow read: if ownsCompletion();
+          allow create: if validCompletion(docId) && isActiveMember() && habitIsActive();
+          allow update: if validCompletion(docId) && isActiveMember() && habitIsActive()
+            && onlyRefreshesTimestamp();
+          allow delete: if ownsCompletion() && isActiveMember();
+        }
+
+        match /cycles/{dateKey} {
+          allow read: if isActiveMember();
+          allow write: if false;
+        }
+      }
+    }
+
+    // ---------------------------------------------------------------
+    // Server-only collections. Clients have no access at all.
+    // ---------------------------------------------------------------
+    match /invitations/{id} {
+      allow read, write: if false;
+    }
+    match /joinCodes/{id} {
+      allow read, write: if false;
+    }
+    match /notificationEvents/{id} {
+      allow read, write: if false;
+    }
+    match /rateLimits/{id} {
+      allow read, write: if false;
     }
   }
 }

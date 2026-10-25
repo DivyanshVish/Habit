@@ -1,6 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:habit_tracker/core/router/app_routes.dart';
+import 'package:habit_tracker/features/notifications/domain/reminders_domain.dart';
+import 'package:habit_tracker/features/notifications/presentation/reminder_tile.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -224,6 +227,23 @@ class _DetailBody extends StatelessWidget {
                 stackGap: space.s4,
                 left: Text(footerLeft, style: footerStyle),
                 right: Text(footerRight, style: footerStyle),
+              ),
+            ),
+            const SizedBox(height: 12),
+            ReminderTile(target: PersonalReminderTarget(habit.id)),
+            const SizedBox(height: 4),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () => context.push(
+                  AppRoutes.sharedNewFrom(
+                    habitId: habit.id,
+                    name: habit.name,
+                    points: habit.points,
+                  ),
+                ),
+                icon: const Icon(Icons.group_add_outlined, size: 18),
+                label: const Text('Share with others'),
               ),
             ),
           ],

@@ -50,10 +50,13 @@ class TodayPage extends StatelessWidget {
         ),
         // In the bottom bar slot so toasts float above it, not over it.
         bottomNavigationBar: BottomAction(
-          child: OutlinedButton.icon(
-            onPressed: () => context.push(AppRoutes.addHabit),
-            icon: const Icon(Icons.add, size: 18),
-            label: const Text('New habit'),
+          child: SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => context.push(AppRoutes.addHabit),
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('New habit'),
+            ),
           ),
         ),
       ),

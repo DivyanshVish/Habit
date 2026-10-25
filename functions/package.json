@@ -1,0 +1,25 @@
+{
+  "name": "habitry-functions",
+  "private": true,
+  "description": "Cloud Functions for Habitry collaborative habits",
+  "type": "commonjs",
+  "main": "lib/src/registry.js",
+  "engines": {
+    "node": "22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test:unit": "npm run build && node --test test/unit/",
+    "test:emulator": "node --test test/emulator/",
+    "emulators:test": "firebase emulators:exec --only firestore --project demo-habitry \"npm run test:emulator\""
+  },
+  "dependencies": {
+    "firebase-admin": "13.4.0"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "4.0.1",
+    "@types/node": "22.15.21",
+    "firebase": "11.10.0",
+    "typescript": "5.8.3"
+  }
+}

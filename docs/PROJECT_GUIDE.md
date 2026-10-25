@@ -504,3 +504,167 @@ on the author's machine.
   reported "not run", and the commands were run on the author's machine.
 
 ---
+
+---
+
+## 15. Collaborative habits (shared habits, groups, invitations)
+
+Added on top of the personal tracker. Personal habits, their data and their
+screens are unchanged. Everything below is new.
+
+### What it does
+- **Shared habits:** two or more people track one habit, each completing on
+  their own. The screen shows "3 of 5 done, 60%". Sharing a personal habit
+  makes a linked copy and leaves the original alone; ticking the linked habit
+  on Today also counts in the shared habit.
+- **Groups:** private groups with owner, admin and member roles. Admins add
+  group habits and set a rule for when the group "succeeds": individual only,
+  more than half, everyone, a set number, or a percentage.
+- **Invitations and join codes:** random, expiring, revocable, rate limited.
+  A shared habit code works once; a group code can be used up to 50 times.
+- **Streaks:** personal (current, best, rate, missed) and group (per habit
+  rule). A personal streak is never reset by someone else missing a day.
+- **Account:** display name, visibility ("named" or "count only"), link a
+  Google account (same user id, so data stays), notification settings.
+- **Navigation:** a bottom bar with Home, Shared, Groups, Inbox (with an unread
+  count) and Profile. Anything opened from a tab covers the bar.
+- **Inbox:** every notification the server sends is saved and listed newest
+  first, with "NEW" on unread ones, mark all as read, and a tap that opens
+  what it is about. It is complete even with push turned off.
+- **Invite someone you know:** the invite sheet lists people you already share
+  a group with. They get a notification and see the invitation, with Accept
+  and Decline, at the top of the Groups tab. No code is involved. You can only
+  invite people you share a group with.
+- **Approve new members:** a group can require an admin to approve anyone who
+  uses a code. Admins see "Waiting to join" on the group page and let people in
+  or decline them; the person is notified.
+- **Group settings and habit editing (admins):** rename the group, change who
+  may invite, turn approval on or off, pick the group's picture; edit a habit's
+  name, days, target and end date. New days or a new target start in two days
+  so no open day is rewritten.
+- **Group picture:** a preset icon and colour, not an upload. Uploading photos
+  needs a storage service and a picker package that are not set up.
+- **Start and end dates** for group habits, with date pickers.
+- **History:** weekly (8 weeks) and monthly (6 months) counts of your own
+  completions on shared and group habits, in words as well as bars.
+- **Activity log (admins):** who joined, left, was removed, was promoted, or
+  changed a habit, newest first, with "Show older".
+- **Reminders:** a "Remind me" switch and time on every habit (personal, shared
+  and group). Needs the free timer described in `functions/README.md`.
+- **Delete account:** Profile > Account. Refused while you own a group or
+  shared habit that others still use.
+- **Sign out and switch account** (Profile > Account):
+  - *Sign out* ends this phone's session and starts a fresh guest account. A
+    Google linked account keeps all its data online; signing back in with that
+    Google account brings it back.
+  - *Switch account* signs in with a different Google account you pick. Picking
+    a Google account that was never used with Habitry starts an empty account.
+  - Both remove this phone's push token from the old account first, so its
+    notifications stop arriving here. If the change does not happen (picker
+    cancelled, no network), the token is put back.
+  - A guest account exists only on this phone, so both actions warn that the
+    data cannot be recovered and ask you to link Google first.
+  - Afterwards the app returns to Today so every screen loads the new account.
+  - Push is off for the new account until you turn it on again on that device.
+- **Move my data to another account** (Profile > Account, Google accounts only):
+  moves everything to a different Google account: habits and history, group
+  memberships and group ownership, shared habits, completions in groups and
+  shared habits, and invitations you created. A guest account does not need
+  this: use *Link Google account*, which keeps the same account.
+  - The server needs both logins: the new account's token authorizes the call,
+    and the old account's token (read before switching) proves it is the same
+    person. Nobody can move someone else's data.
+  - The new account must have **no Habitry data**. Merging two accounts is not
+    attempted; the move is refused with a plain message.
+  - Every step can be repeated, so a move that times out is finished by trying
+    again. The old account is emptied at the end (a guest sign in is deleted).
+  - If the data could not move, the new account is still the one signed in. The
+    app says so and tells you to switch back.
+  - Other members keep seeing your past history under your name.
+  - Not moved: push tokens (they belong to the phone), and the "created by"
+    note on group habits you made, which stays as history.
+- **Notifications:** invitation accepted or declined, group target reached,
+  and habit reminders. Quiet hours respected, duplicates suppressed, and a
+  failed push never affects a completion.
+
+### Backend
+Free to run: Firestore on the Spark plan, plus a small API on Vercel's free
+Hobby plan. No Cloud Functions, so no billing account is needed.
+
+| Part | Where | Purpose |
+| --- | --- | --- |
+| Firestore rules | `firestore.rules` | Clients write only their own completion; everything else is read-only or server-only |
+| API (TypeScript) | `functions/src`, `functions/api` | One endpoint, `POST /api/call`: groups, roles, invitations, cycles, notifications, account deletion |
+| Indexes | `firestore.indexes.json` | Queries used by the API |
+| Pure logic | `functions/src/logic.ts`, `engine.ts` | Unit tested with `node --test` |
+| App client | `lib/core/platform/http_callable_client.dart` | Sends the Firebase ID token; the server takes the user id from it |
+
+Setup and deploy steps are in `functions/README.md`. In short: create a
+Firebase service account key, add it to Vercel as `FIREBASE_SERVICE_ACCOUNT`,
+deploy, then run the app with
+`--dart-define=API_BASE_URL=https://your-project.vercel.app`.
+
+Collections: `sharedHabits`, `groups`, `invitations`, `joinCodes`,
+`notificationEvents`, `rateLimits`, plus `users/{uid}/settings`, `devices`,
+`notifications`, `memberships`. Completion documents use the id
+`{uid}_{yyyy-MM-dd}`, so repeating a request cannot make a second record.
+
+### How group progress stays correct
+1. The first request about a habit on a given day **opens that day's cycle**
+   and snapshots who is eligible at that moment. People who join later count
+   from the next day. People who leave stay in that day's numbers.
+2. The app calls `refreshCycle` when a screen opens and after each completion.
+   The server **recomputes the cycle from the completion documents** (never
+   add or subtract) inside a transaction, so two people finishing at once end
+   in the same state, and calling it cannot change the numbers.
+3. Completion documents can only be read by their owner. Other members read
+   the cycle, which lists only the people who chose to be named.
+4. A cycle closes once no client can write to it (UTC day D+2). That happens
+   when someone opens the habit, and a daily cron closes the rest. Days nobody
+   opened count as missed for the group streak.
+
+### Run and deploy
+```sh
+# App
+dart format lib test
+flutter analyze
+flutter test
+flutter run --dart-define=API_BASE_URL=https://your-project.vercel.app
+
+# Backend unit tests (no emulator, no network)
+cd functions && npm install && npm run test:unit
+
+# Rules tests (needs Java and the Firebase emulator)
+cd functions && npm run emulators:test
+
+# Rules and indexes (free)
+firebase deploy --only firestore
+```
+Link Google sign-in needs the Google provider enabled in the console and, on
+Android, the app's SHA-1 added to the Firebase project.
+
+### Rules of the road
+- Group size is capped at 50, group habits at 20 per group.
+- Group habit schedule or target edits start two UTC days later, so no open
+  day is rewritten. Name and description change at once.
+- The app reports its UTC offset on launch. Quiet hours use it, so they follow
+  the user across time zones.
+- Account deletion is blocked while you own a group or shared habit that other
+  people still use. Transfer ownership first.
+
+### Decisions you can change
+Private groups only; no admin-made completions for someone else; challenges,
+achievements and partner dashboards are Phase 2 and not built.
+
+### Status at the time of writing
+| Item | State |
+| --- | --- |
+| Dart tests | 870 passing, analyzer clean |
+| Backend pure logic and HTTP layer (`node --test`) | 69 passing, shared fixtures agree with Dart |
+| Firestore rules | Compiled and released by Firebase earlier; the join request rule is new and not deployed yet; the rules tests were **written but never run** (need the emulator) |
+| API handlers | Compile against the real Admin SDK; **never run against Firestore end to end** except group, habit and invite code creation, which you used |
+| Invitations to a person, join approval, reminders, delete, move, switch | **Built and unit tested, not tried on a phone** |
+| Push, Google sign-in on a second device | **Not run on a device** |
+| iOS | Not built |
+| Not built | Group picture upload, deep links, App Check, cleanup of old cycles and rate limit documents, automatic on-device reminders (they are sent by the server) |
+| Behaves differently from a trigger based backend | Numbers refresh when a screen opens or a completion is saved. If a phone is offline, the group numbers catch up on the next refresh |
