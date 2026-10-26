@@ -4,9 +4,14 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:habit_tracker/core/platform/http_callable_client.dart';
 import 'package:habit_tracker/core/platform/platform_services.dart';
 
-/// Address of the backend (the Vercel deployment), set at build time:
-/// `flutter run --dart-define=API_BASE_URL=https://your-app.vercel.app`
-const String apiBaseUrl = String.fromEnvironment('API_BASE_URL');
+/// Address of the backend (the Vercel deployment). Override it at build time
+/// with `--dart-define=API_BASE_URL=https://your-app.vercel.app`. The default is
+/// this project's own deployment, so running from an IDE without the flag still
+/// reaches it.
+const String apiBaseUrl = String.fromEnvironment(
+  'API_BASE_URL',
+  defaultValue: 'https://habbitry.vercel.app',
+);
 
 /// The real plugin-backed services. Imported by `main.dart` only.
 ///

@@ -137,16 +137,32 @@ void main() {
     expect(transport.url, isNull);
   });
 
-  test('a missing base address explains itself', () async {
+  test(
+    'a missing base address is a setup problem, not a network problem',
+    () async {
+      await expectLater(
+        build(baseUrl: '').call('ping'),
+        throwsA(
+          isA<CallableException>()
+              .having((e) => e.code, 'code', 'not-configured')
+              .having((e) => e.message, 'message', contains('API_BASE_URL')),
+        ),
+      );
+      expect(transport.url, isNull);
+    },
+  );
+
+  test('a blank base address counts as missing', () async {
     await expectLater(
-      build(baseUrl: '').call('ping'),
+      build(baseUrl: '   ').call('ping'),
       throwsA(
-        isA<CallableException>()
-            .having((e) => e.code, 'code', 'unavailable')
-            .having((e) => e.message, 'message', contains('not set up')),
+        isA<CallableException>().having(
+          (e) => e.code,
+          'code',
+          'not-configured',
+        ),
       ),
     );
-    expect(transport.url, isNull);
   });
 
   group('network problems', () {
@@ -168,36 +184,79 @@ void main() {
   });
 
   group('unexpected answers', () {
-    test('a non JSON 502 page is reported as unavailable', () async {
-      transport.response = (status: 502, body: '<html>Bad gateway</html>');
-
+    Future<void> expectError(
+      int status,
+      String body,
+      String code, {
+      String? messageHas,
+    }) async {
+      transport.response = (status: status, body: body);
       await expectLater(
         build().call('ping'),
         throwsA(
-          isA<CallableException>().having((e) => e.code, 'code', 'unavailable'),
+          isA<CallableException>()
+              .having((e) => e.code, 'code', code)
+              .having(
+                (e) => e.message,
+                'message',
+                messageHas == null ? isNotEmpty : contains(messageHas),
+              ),
         ),
       );
-    });
+    }
+
+    test(
+      'a gateway problem (502, 503, 504) means not reachable right now',
+      () async {
+        for (final status in [502, 503, 504]) {
+          await expectError(
+            status,
+            '<html>Bad gateway</html>',
+            'unavailable',
+            messageHas: 'could not be reached',
+          );
+        }
+      },
+    );
+
+    test(
+      'a crashed function (500 page) is a service fault, not a network one',
+      () async {
+        await expectError(
+          500,
+          'A server error occurred FUNCTION_INVOCATION_FAILED',
+          'internal',
+          messageHas: 'HTTP 500',
+        );
+      },
+    );
+
+    test(
+      'a wrong address (404 page) shows the status so it can be spotted',
+      () async {
+        await expectError(
+          404,
+          '<html>The page could not be found</html>',
+          'internal',
+          messageHas: 'HTTP 404',
+        );
+      },
+    );
 
     test('a JSON array is not a valid answer', () async {
-      transport.response = (status: 200, body: '[1,2]');
-
-      await expectLater(
-        build().call('ping'),
-        throwsA(
-          isA<CallableException>().having((e) => e.code, 'code', 'internal'),
-        ),
-      );
+      await expectError(200, '[1,2]', 'internal');
     });
 
-    test('a 500 without an error body is unavailable', () async {
-      transport.response = (status: 500, body: '{}');
+    test('a 500 with an empty JSON body is a service fault', () async {
+      await expectError(500, '{}', 'internal', messageHas: 'HTTP 500');
+    });
 
-      await expectLater(
-        build().call('ping'),
-        throwsA(
-          isA<CallableException>().having((e) => e.code, 'code', 'unavailable'),
-        ),
+    test('an error body with a code keeps that code even on a 5xx', () async {
+      await expectError(
+        500,
+        '{"error":{"code":"resource-exhausted","message":"Too many attempts."}}',
+        'resource-exhausted',
+        messageHas: 'Too many',
       );
     });
   });

@@ -20,6 +20,8 @@ Failure mapExceptionToFailure(Object error) {
       'unauthenticated' ||
       'permission-denied' => Failure.unauthenticated(message: error.message),
       'not-found' => Failure.notFound(message: error.message),
+      // A setup mistake. Saying "network" would send people to check Wi-Fi.
+      'not-configured' || 'internal' => Failure.server(message: error.message),
       'unavailable' || 'deadline-exceeded' => const Failure.network(),
       // The server states the rule that was broken in plain words.
       'invalid-argument' ||

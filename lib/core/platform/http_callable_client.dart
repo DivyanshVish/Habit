@@ -69,9 +69,11 @@ class HttpCallableClient implements CallableClient {
     Map<String, dynamic> data = const {},
   ]) async {
     if (baseUrl.trim().isEmpty) {
+      // A setup mistake, not a network problem: say so.
       throw const CallableException(
-        'unavailable',
-        'The online service is not set up for this build.',
+        'not-configured',
+        'The online service address is not set. Run the app with '
+            '--dart-define=API_BASE_URL=https://your-project.vercel.app',
       );
     }
     final token = await idToken();
@@ -104,17 +106,9 @@ class HttpCallableClient implements CallableClient {
     try {
       decoded = jsonDecode(response.body);
     } on FormatException {
-      throw CallableException(
-        response.status >= 500 ? 'unavailable' : 'internal',
-        'The service sent an unexpected answer.',
-      );
+      throw _unexpectedAnswer(response.status);
     }
-    if (decoded is! Map) {
-      throw const CallableException(
-        'internal',
-        'The service sent an unexpected answer.',
-      );
-    }
+    if (decoded is! Map) throw _unexpectedAnswer(response.status);
 
     final error = decoded['error'];
     if (response.status >= 400 || error != null) {
@@ -125,13 +119,28 @@ class HttpCallableClient implements CallableClient {
           details: error['details'],
         );
       }
-      throw CallableException(
-        response.status >= 500 ? 'unavailable' : 'internal',
-        'Request failed.',
-      );
+      throw _unexpectedAnswer(response.status);
     }
 
     final result = decoded['result'];
     return result is Map ? Map<String, dynamic>.from(result) : const {};
+  }
+
+  /// The server answered, but not with something this app understands. A
+  /// gateway problem (502, 503, 504) means it could not be reached right now.
+  /// Anything else is a fault on the service side or a wrong address, and the
+  /// status code is shown so it can be told apart from a network problem.
+  CallableException _unexpectedAnswer(int status) {
+    if (status == 502 || status == 503 || status == 504) {
+      return const CallableException(
+        'unavailable',
+        'The service could not be reached right now.',
+      );
+    }
+    return CallableException(
+      'internal',
+      'The service answered with an error (HTTP $status). '
+          'Try again, and check the service address if it keeps happening.',
+    );
   }
 }
